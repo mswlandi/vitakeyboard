@@ -1,6 +1,7 @@
 #include <string.h>
 #include <pspkernel.h>
 #include <pspkdebug.h>
+#include <pspctrl.h>
 
 #include "hidmouse.h"
 #include "usb.h"
@@ -8,7 +9,7 @@
 #define PSP_USB_MOUSE            "pspmouse"
 #define PSP_USB_MOUSE_PID        0x7d
 
-static char g_inputs[4] __attribute__ ((aligned(64))) = { 0x00, 0x01, 0x01, 0x00 };
+static char g_inputs[4] __attribute__ ((aligned(64))) = { 0x00, 0x01, 0x02, 0x00 };
 static struct UsbbdDeviceRequest g_request;
 static struct UsbbdDeviceRequest g_reportrequest;
 static SceUID g_mainalarm = -1;
@@ -409,8 +410,6 @@ static
 void send_inputs (void)
 {
   if (!g_request.unused) {
-    SceCtrlData pad;
-    sceCtrlReadBufferPositive(&pad, 1);
     g_request.endpoint = &endpoints[1];
     g_request.data = g_inputs;
     g_request.size = sizeof (g_inputs);
@@ -438,9 +437,6 @@ int mouse_start (void)
 
   ret = sceUsbActivate (PSP_USB_MOUSE_PID);
   if (ret < 0) return ret;
-  
-  sceCtrlSetSamplingCycle (0);
-  sceCtrlSetSamplingMode (PSP_CTRL_MODE_ANALOG);
   
   return ret;
 }
