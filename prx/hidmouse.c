@@ -12,7 +12,7 @@
 static char g_inputs[4] __attribute__ ((aligned(64))) = { 0x00, 0x00, 0x00, 0x00 };
 static struct UsbbdDeviceRequest g_request;
 static struct UsbbdDeviceRequest g_reportrequest;
-static SceUID g_mainalarm = -1;
+static SceUID g_thid = -1;
 
 static
 unsigned char hid_report[] __attribute__ ((aligned(64))) = {
@@ -316,31 +316,6 @@ struct UsbDriver g_driver =
 static void send_inputs (void);
 
 static
-SceUInt alarm_handler (void *common)
-{
-  SceCtrlData pad;
-  sceCtrlSetSamplingCycle (0);
-  sceCtrlSetSamplingMode (1);
-  if (sceCtrlReadBufferPositive (&pad, 1) >= 0) {
-    g_inputs[1] = (pad.Lx >> 4) - 8;
-    g_inputs[2] = (pad.Ly >> 4) - 8;
-    g_inputs[0] = g_inputs[3] = 0;
-    if (pad.Buttons & PSP_CTRL_UP)
-      g_inputs[3] = +1;
-    if (pad.Buttons & PSP_CTRL_DOWN)
-      g_inputs[3] = -1;
-    if (pad.Buttons & PSP_CTRL_CROSS)
-      g_inputs[0] |= 1;
-    if (pad.Buttons & PSP_CTRL_CIRCLE)
-      g_inputs[0] |= 2;
-    if (pad.Buttons & PSP_CTRL_SQUARE)
-      g_inputs[0] |= 4;
-  }
-  send_inputs ();
-  return 50000;
-}
-
-static
 void complete_request (struct UsbbdDeviceRequest *req)
 {
   Kprintf ("complete_request\n");
@@ -389,7 +364,6 @@ static
 int usb_attach (int usb_version)
 {
   Kprintf ("usb_attach %d\n", usb_version);
-  if (g_mainalarm < 0) g_mainalarm = sceKernelSetAlarm (50000, &alarm_handler, NULL);
   return 0;
 }
 
@@ -398,8 +372,6 @@ static
 void usb_detach (void)
 {
   Kprintf ("usb_detach\n");
-  if (g_mainalarm >= 0) sceKernelCancelAlarm (g_mainalarm);
-  g_mainalarm = -1;
 }
 
 static
@@ -442,6 +414,45 @@ void send_inputs (void)
   }
 }
 
+static
+int update_mouse (SceSize args, void *argp)
+{
+  SceCtrlData pad;
+  unsigned char x0 = 0, y0 = 0;
+  int first = 1;
+  
+  sceCtrlSetSamplingCycle (0);
+  sceCtrlSetSamplingMode (1);
+  while (1) {
+    if (sceCtrlReadBufferPositive (&pad, 1) >= 0) {
+      g_inputs[1] = (pad.Lx >> 3) - x0;
+      g_inputs[2] = (pad.Ly >> 3) - y0;
+      g_inputs[0] = g_inputs[3] = 0;
+      if (pad.Buttons & PSP_CTRL_UP)
+        g_inputs[3] = +1;
+      if (pad.Buttons & PSP_CTRL_DOWN)
+        g_inputs[3] = -1;
+      if (pad.Buttons & PSP_CTRL_CROSS)
+        g_inputs[0] |= 1;
+      if (pad.Buttons & PSP_CTRL_CIRCLE)
+        g_inputs[0] |= 2;
+      if (pad.Buttons & PSP_CTRL_SQUARE)
+        g_inputs[0] |= 4;
+      sceKernelDcacheWritebackRange (g_inputs, sizeof (g_inputs));
+ 
+    }
+    if (first) {
+      x0 = g_inputs[1];
+      y0 = g_inputs[2];
+    }
+    if (sceUsbGetState () & PSP_USB_STATUS_CONNECTION_ESTABLISHED)
+      send_inputs ();
+    sceKernelDelayThread (20000);
+    first = 0;
+  }
+  return 0;
+}
+
 /* Usb start routine*/
 int mouse_start (void)
 {
@@ -456,10 +467,11 @@ int mouse_start (void)
   ret = sceUsbActivate (PSP_USB_MOUSE_PID);
   if (ret < 0) return ret;
   
-  sceCtrlSetSamplingCycle (0);
-  sceCtrlSetSamplingMode (1);
+  g_thid = sceKernelCreateThread ("update_thread", &update_mouse, 0x11, 0xFA0, 0, 0);
+  if (g_thid >= 0) sceKernelStartThread (g_thid, 0, 0);
+  else return g_thid;
   
-  return ret;
+  return 0;
 }
 
 /* Usb stop */
