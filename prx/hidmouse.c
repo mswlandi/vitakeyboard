@@ -9,7 +9,7 @@
 #define PSP_USB_MOUSE            "pspmouse"
 #define PSP_USB_MOUSE_PID        0x7d
 
-static char g_inputs[4] __attribute__ ((aligned(64))) = { 0x00, 0x01, 0x02, 0x00 };
+static char g_inputs[4] __attribute__ ((aligned(64))) = { 0x00, 0x00, 0x00, 0x00 };
 static struct UsbbdDeviceRequest g_request;
 static struct UsbbdDeviceRequest g_reportrequest;
 static SceUID g_mainalarm = -1;
@@ -318,8 +318,26 @@ static void send_inputs (void);
 static
 SceUInt alarm_handler (void *common)
 {
+  SceCtrlData pad;
+  sceCtrlSetSamplingCycle (0);
+  sceCtrlSetSamplingMode (1);
+  if (sceCtrlReadBufferPositive (&pad, 1) >= 0) {
+    g_inputs[1] = (pad.Lx >> 4) - 8;
+    g_inputs[2] = (pad.Ly >> 4) - 8;
+    g_inputs[0] = g_inputs[3] = 0;
+    if (pad.Buttons & PSP_CTRL_UP)
+      g_inputs[3] = +1;
+    if (pad.Buttons & PSP_CTRL_DOWN)
+      g_inputs[3] = -1;
+    if (pad.Buttons & PSP_CTRL_CROSS)
+      g_inputs[0] |= 1;
+    if (pad.Buttons & PSP_CTRL_CIRCLE)
+      g_inputs[0] |= 2;
+    if (pad.Buttons & PSP_CTRL_SQUARE)
+      g_inputs[0] |= 4;
+  }
   send_inputs ();
-  return 10000;
+  return 50000;
 }
 
 static
@@ -371,7 +389,7 @@ static
 int usb_attach (int usb_version)
 {
   Kprintf ("usb_attach %d\n", usb_version);
-  if (g_mainalarm < 0) g_mainalarm = sceKernelSetAlarm (10000, &alarm_handler, NULL);
+  if (g_mainalarm < 0) g_mainalarm = sceKernelSetAlarm (50000, &alarm_handler, NULL);
   return 0;
 }
 
@@ -437,6 +455,9 @@ int mouse_start (void)
 
   ret = sceUsbActivate (PSP_USB_MOUSE_PID);
   if (ret < 0) return ret;
+  
+  sceCtrlSetSamplingCycle (0);
+  sceCtrlSetSamplingMode (1);
   
   return ret;
 }
