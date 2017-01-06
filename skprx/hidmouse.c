@@ -1,18 +1,20 @@
-#include <string.h>
-#include <pspkernel.h>
-#include <pspkdebug.h>
-#include <pspctrl.h>
+#include <psp2kern/kernel/threadmgr.h>
+#include <psp2kern/kernel/cpu.h>
+#include <psp2kern/ctrl.h>
+#include <psp2kern/udcd.h>
 
 #include "hidmouse.h"
-#include "usb.h"
 
-#define PSP_USB_MOUSE            "pspmouse"
+#define Kprintf(...) (void)0
+
+#define PSP_USB_MOUSE            "PSP_MOUSE"
 #define PSP_USB_MOUSE_PID        0x7d
 
 static char g_inputs[4] __attribute__ ((aligned(64))) = { 0x00, 0x00, 0x00, 0x00 };
-static struct UsbbdDeviceRequest g_request;
-static struct UsbbdDeviceRequest g_reportrequest;
+static struct SceUdcdDeviceRequest g_request;
+static struct SceUdcdDeviceRequest g_reportrequest;
 static SceUID g_thid = -1;
+static int g_run = 1;
 
 static
 unsigned char hid_report[] __attribute__ ((aligned(64))) = {
@@ -60,20 +62,20 @@ unsigned char hiddesc[] = {
 
 /* Endpoint blocks */
 static
-struct UsbEndpoint endpoints[2] = {
-  { 0, 0, 0 },
-  { 1, 0, 0 }
+struct SceUdcdEndpoint endpoints[2] = {
+  { 0x00, 0, 0, 0 },
+  { 0x80, 1, 0, 0 }
 };
 
 /* Interfaces */
 static
-struct UsbInterface interfaces[1] = {
+struct SceUdcdInterface interfaces[1] = {
   { -1, 0, 1 }
 };
 
 /* String descriptor */
 static
-struct StringDescriptor descriptors[2] = {
+struct SceUdcdStringDescriptor descriptors[2] = {
   {
     16,
     USB_DT_STRING,
@@ -87,7 +89,7 @@ struct StringDescriptor descriptors[2] = {
 
 /* HI-Speed device descriptor */
 static
-struct DeviceDescriptor devdesc_hi =
+struct SceUdcdDeviceDescriptor devdesc_hi =
 {
   USB_DT_DEVICE_SIZE,
   USB_DT_DEVICE,
@@ -107,7 +109,7 @@ struct DeviceDescriptor devdesc_hi =
 
 /* Hi-Speed endpoint descriptors */
 static
-struct EndpointDescriptor endpdesc_hi[2] =
+struct SceUdcdEndpointDescriptor endpdesc_hi[2] =
 {
   {
     USB_DT_ENDPOINT_SIZE ,
@@ -115,7 +117,7 @@ struct EndpointDescriptor endpdesc_hi[2] =
     0x81, /* bEndpointAddress */
     0x03, /* bmAttributes */
     0x04, /* wMaxPacketSize */
-    0x0A  /* bInterval */
+    0x05  /* bInterval */
   },
   {
     0,
@@ -124,7 +126,7 @@ struct EndpointDescriptor endpdesc_hi[2] =
 
 /* Hi-Speed interface descriptor */
 static
-struct InterfaceDescriptor interdesc_hi[2] =
+struct SceUdcdInterfaceDescriptor interdesc_hi[2] =
 {
   {
     USB_DT_INTERFACE_SIZE,
@@ -147,7 +149,7 @@ struct InterfaceDescriptor interdesc_hi[2] =
 
 /* Hi-Speed settings */
 static
-struct InterfaceSettings settings_hi[1] =
+struct SceUdcdInterfaceSettings settings_hi[1] =
 {
   {
     &interdesc_hi[0],
@@ -158,7 +160,7 @@ struct InterfaceSettings settings_hi[1] =
 
 /* Hi-Speed configuration descriptor */
 static
-struct ConfigDescriptor confdesc_hi =
+struct SceUdcdConfigDescriptor confdesc_hi =
 {
   USB_DT_CONFIG_SIZE,
   USB_DT_CONFIG,
@@ -174,7 +176,7 @@ struct ConfigDescriptor confdesc_hi =
 
 /* Hi-Speed configuration */
 static
-struct UsbConfiguration config_hi =
+struct SceUdcdConfiguration config_hi =
 {
   &confdesc_hi,
   &settings_hi[0],
@@ -184,11 +186,11 @@ struct UsbConfiguration config_hi =
 
 /* Full-Speed device descriptor */
 static
-struct DeviceDescriptor devdesc_full =
+struct SceUdcdDeviceDescriptor devdesc_full =
 {
   USB_DT_DEVICE_SIZE,
   USB_DT_DEVICE,
-  0x110,         /* bcdUSB */
+  0x200,         /* bcdUSB (should be 0x110 but the PSVita freezes otherwise) */
   USB_CLASS_PER_INTERFACE,  /* bDeviceClass */
   0,             /* bDeviceSubClass */
   0,             /* bDeviceProtocol */
@@ -204,7 +206,7 @@ struct DeviceDescriptor devdesc_full =
 
 /* Full-Speed endpoint descriptors */
 static
-struct EndpointDescriptor endpdesc_full[2] =
+struct SceUdcdEndpointDescriptor endpdesc_full[2] =
 {
   {
     USB_DT_ENDPOINT_SIZE ,
@@ -212,7 +214,7 @@ struct EndpointDescriptor endpdesc_full[2] =
     0x81, /* bEndpointAddress */
     0x03, /* bmAttributes */
     0x04, /* wMaxPacketSize */
-    0x0A  /* bInterval */
+    0x05  /* bInterval */
   },
   {
     0,
@@ -222,7 +224,7 @@ struct EndpointDescriptor endpdesc_full[2] =
 
 /* Full-Speed interface descriptor */
 static
-struct InterfaceDescriptor interdesc_full[2] =
+struct SceUdcdInterfaceDescriptor interdesc_full[2] =
 {
   {
     USB_DT_INTERFACE_SIZE,
@@ -246,7 +248,7 @@ struct InterfaceDescriptor interdesc_full[2] =
 
 /* Full-Speed settings */
 static
-struct InterfaceSettings settings_full[1] =
+struct SceUdcdInterfaceSettings settings_full[1] =
 {
   {
     &interdesc_full[0],
@@ -257,7 +259,7 @@ struct InterfaceSettings settings_full[1] =
 
 /* Full-Speed configuration descriptor */
 static
-struct ConfigDescriptor confdesc_full =
+struct SceUdcdConfigDescriptor confdesc_full =
 {
   USB_DT_CONFIG_SIZE,
   USB_DT_CONFIG,
@@ -272,7 +274,7 @@ struct ConfigDescriptor confdesc_full =
 
 /* Full-Speed configuration */
 static
-struct UsbConfiguration config_full =
+struct SceUdcdConfiguration config_full =
 {
   &confdesc_full,
   &settings_full[0],
@@ -284,14 +286,14 @@ struct UsbConfiguration config_full =
 /* Forward define driver functions */
 static int start_func (int size, void *args);
 static int stop_func (int size, void *args);
-static int usb_recvctl (int arg1, int arg2, struct DeviceRequest *req);
+static int usb_recvctl (int arg1, int arg2, struct SceUdcdEP0DeviceRequest *req);
 static int usb_change (int interfaceNumber, int alternateSetting);
 static int usb_attach (int usb_version);
 static void usb_detach (void);
-static void usb_configure (int usb_version, int desc_count, struct InterfaceSettings *settings);
+static void usb_configure (int usb_version, int desc_count, struct SceUdcdInterfaceSettings *settings);
 
 /* USB host driver */
-struct UsbDriver g_driver =
+struct SceUdcdDriver g_driver =
 {
   PSP_USB_MOUSE,               /* driverName */
   2,                           /* numEndpoints */
@@ -302,6 +304,8 @@ struct UsbDriver g_driver =
   &devdesc_full,               /* descriptor */
   &config_full,                /* configuration */
   &descriptors[0],             /* stringDescriptors */
+  NULL,
+  NULL,
   &usb_recvctl,                /* processRequest */
   &usb_change,                 /* chageSetting */
   &usb_attach,                 /* attach */
@@ -309,6 +313,8 @@ struct UsbDriver g_driver =
   &usb_configure,              /* configure */
   &start_func,                 /* start func */
   &stop_func,                  /* stop func */
+  0,
+  0,
   NULL                         /* link to driver */
 };
 
@@ -316,7 +322,7 @@ struct UsbDriver g_driver =
 static void send_inputs (void);
 
 static
-void complete_request (struct UsbbdDeviceRequest *req)
+void complete_request (struct SceUdcdDeviceRequest *req)
 {
   Kprintf ("complete_request\n");
   req->unused = NULL;
@@ -325,12 +331,12 @@ void complete_request (struct UsbbdDeviceRequest *req)
 
 /* Device request */
 static
-int usb_recvctl (int arg1, int arg2, struct DeviceRequest *req)
+int usb_recvctl (int arg1, int arg2, struct SceUdcdEP0DeviceRequest *req)
 {
   Kprintf ("recvctl: %x %x\n", arg1, arg2);
   Kprintf ("request: %x type: %x wValue: %x wIndex: %x wLength: %x\n",
     req->bRequest, req->bmRequestType, req->wValue, req->wIndex, req->wLength);
-  
+
   if (req->bmRequestType == 0x81 && req->bRequest == 0x06 && req->wValue == 0x2200 && arg2 != -1) {
     if (!g_reportrequest.unused) {
       g_reportrequest.data = hid_report;
@@ -344,8 +350,8 @@ int usb_recvctl (int arg1, int arg2, struct DeviceRequest *req)
       g_reportrequest.returnCode = 0;
       g_reportrequest.unused = &g_reportrequest;
       g_reportrequest.next = NULL;
-      g_reportrequest.physicalAddress = NULL;    
-      sceUsbbdReqSend (&g_reportrequest);
+      g_reportrequest.physicalAddress = NULL;
+      ksceUdcdReqSend (&g_reportrequest);
     }
   }
   return 0;
@@ -375,7 +381,7 @@ void usb_detach (void)
 }
 
 static
-void usb_configure (int usb_version, int desc_count, struct InterfaceSettings *settings)
+void usb_configure (int usb_version, int desc_count, struct SceUdcdInterfaceSettings *settings)
 {
   Kprintf ("usb_configure %d %d %p %d\n", usb_version, desc_count, settings, settings->numDescriptors);
 }
@@ -410,7 +416,7 @@ void send_inputs (void)
     g_request.unused = &g_request;
     g_request.next = NULL;
     g_request.physicalAddress = NULL;
-    sceUsbbdReqSend (&g_request);
+    ksceUdcdReqSend (&g_request);
   }
 }
 
@@ -420,34 +426,34 @@ int update_mouse (SceSize args, void *argp)
   SceCtrlData pad;
   unsigned char x0 = 0, y0 = 0;
   int first = 1;
-  
-  sceCtrlSetSamplingCycle (0);
-  sceCtrlSetSamplingMode (1);
-  while (1) {
-    if (sceCtrlReadBufferPositive (&pad, 1) >= 0) {
-      g_inputs[1] = (pad.Lx >> 3) - x0;
-      g_inputs[2] = (pad.Ly >> 3) - y0;
+
+  //ksceCtrlSetSamplingCycle (0);
+  ksceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
+  while (g_run) {
+    if (ksceCtrlReadBufferPositive (0, &pad, 1) >= 0) {
+      g_inputs[1] = (pad.lx >> 3) - x0;
+      g_inputs[2] = (pad.ly >> 3) - y0;
       g_inputs[0] = g_inputs[3] = 0;
-      if (pad.Buttons & PSP_CTRL_UP)
+      if (pad.buttons & SCE_CTRL_UP)
         g_inputs[3] = +1;
-      if (pad.Buttons & PSP_CTRL_DOWN)
+      if (pad.buttons & SCE_CTRL_DOWN)
         g_inputs[3] = -1;
-      if (pad.Buttons & PSP_CTRL_CROSS)
+      if (pad.buttons & SCE_CTRL_CROSS)
         g_inputs[0] |= 1;
-      if (pad.Buttons & PSP_CTRL_CIRCLE)
+      if (pad.buttons & SCE_CTRL_CIRCLE)
         g_inputs[0] |= 2;
-      if (pad.Buttons & PSP_CTRL_SQUARE)
+      if (pad.buttons & SCE_CTRL_SQUARE)
         g_inputs[0] |= 4;
-      sceKernelDcacheWritebackRange (g_inputs, sizeof (g_inputs));
- 
+      ksceKernelCpuDcacheWritebackRange (g_inputs, sizeof (g_inputs));
+
     }
     if (first) {
       x0 = g_inputs[1];
       y0 = g_inputs[2];
     }
-    if (sceUsbGetState () & PSP_USB_STATUS_CONNECTION_ESTABLISHED)
+    if (ksceUdcdGetDeviceState () & SCE_UDCD_STATUS_CONNECTION_ESTABLISHED)
       send_inputs ();
-    sceKernelDelayThread (20000);
+    ksceKernelDelayThread (20000);
     first = 0;
   }
   return 0;
@@ -457,29 +463,43 @@ int update_mouse (SceSize args, void *argp)
 int mouse_start (void)
 {
   int ret = 0;
-  ret = sceUsbbdRegister (&g_driver);
-  if (ret < 0) return ret;
-  ret = sceUsbStart (PSP_USB_BUS_DRIVERNAME, 0, 0);
-  if (ret < 0) return ret;
-  ret = sceUsbStart (PSP_USB_MOUSE, 0, 0);
+  ret = ksceUdcdRegister (&g_driver);
   if (ret < 0) return ret;
 
-  ret = sceUsbActivate (PSP_USB_MOUSE_PID);
+  ksceUdcdDeactivate();
+  ksceUdcdStop("USB_MTP_Driver", 0, NULL);
+  ksceUdcdStop("USBPSPCommunicationDriver", 0, NULL);
+  ksceUdcdStop("USBSerDriver", 0, NULL);
+  ksceUdcdStop("USBDeviceControllerDriver", 0, NULL);
+
+  ret = ksceUdcdStart ("USBDeviceControllerDriver", 0, 0);
   if (ret < 0) return ret;
-  
-  g_thid = sceKernelCreateThread ("update_thread", &update_mouse, 0x11, 0xFA0, 0, 0);
-  if (g_thid >= 0) sceKernelStartThread (g_thid, 0, 0);
+  ret = ksceUdcdStart (PSP_USB_MOUSE, 0, 0);
+  if (ret < 0) return ret;
+
+  ret = ksceUdcdActivate (PSP_USB_MOUSE_PID);
+  if (ret < 0) return ret;
+
+  g_thid = ksceKernelCreateThread ("update_thread", &update_mouse, 0x3C, 0x1000, 0, 0x10000, 0);
+  if (g_thid >= 0) ksceKernelStartThread (g_thid, 0, 0);
   else return g_thid;
-  
+
   return 0;
 }
 
 /* Usb stop */
 int mouse_stop (void)
 {
-  sceUsbDeactivate ();
-  sceUsbStop (PSP_USB_MOUSE, 0, 0);
-  sceUsbStop (PSP_USB_BUS_DRIVERNAME, 0, 0);
-  sceUsbbdUnregister (&g_driver);
+  if (g_thid > 0) {
+    SceUInt timeout = 0xFFFFFFFF;
+    g_run = 0;
+    ksceKernelWaitThreadEnd(g_thid, NULL, &timeout);
+    ksceKernelDeleteThread(g_thid);
+  }
+
+  ksceUdcdDeactivate ();
+  ksceUdcdStop (PSP_USB_MOUSE, 0, 0);
+  ksceUdcdStop ("USBDeviceControllerDriver", 0, 0);
+  ksceUdcdUnregister (&g_driver);
   return 0;
 }

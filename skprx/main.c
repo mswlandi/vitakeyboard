@@ -1,8 +1,7 @@
-
-#include <pspkernel.h>
+#include <psp2kern/kernel/modulemgr.h>
 #include "hidmouse.h"
 
-PSP_MODULE_INFO ("hidmouse", PSP_MODULE_KERNEL, 1, 1);
+void _start() __attribute__ ((weak, alias ("module_start")));
 
 int module_start (SceSize args, void *argp)
 {
@@ -11,11 +10,11 @@ int module_start (SceSize args, void *argp)
   ret = mouse_start ();
   if (ret < 0) return ret;
 
-  return 0;
+  return SCE_KERNEL_START_SUCCESS;
 }
 
 int module_stop (SceSize args, void *argp)
 {
   mouse_stop ();
-  return 0;
+  return SCE_KERNEL_STOP_SUCCESS;
 }
