@@ -4,9 +4,9 @@ set(CMAKE_SYSTEM_NAME "Generic")
 set(CMAKE_C_COMPILER "arm-vita-eabi-gcc")
 set(CMAKE_CXX_COMPILER "arm-vita-eabi-g++")
 
-project(pspMouse)
-set(TITLE_ID "PSPMOUSE0")
-set(TITLE_NAME "pspMouse")
+project(vitakeyboard)
+set(TITLE_ID "KEYBOARD0")
+set(TITLE_NAME "VitaKeyboard")
 
 set(CMAKE_C_FLAGS "-Wl,-q -Wall -std=gnu11")
 set(CMAKE_C_FLAGS_DEBUG "-O0 -g3") # added to gcc flags when MAKE_BUILD_TYPE=Debug

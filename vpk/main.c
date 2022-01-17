@@ -21,10 +21,10 @@ int main (int argc, char **argv)
   psvDebugScreenInit();
 
   printf ("Loading modules... ");
-  modid = load_module ("ux0:/data/hidmouse.skprx", 0, 0);
+  modid = load_module ("ux0:/tai/hidkeyboard.skprx", 0, 0);
   if (modid < 0) {
     printf ("failed with 0x%08X\n", modid);
-    printf ("Place the skprx at ux0:/data/hidmouse.skprx\n", modid);
+    printf("Place the skprx at ux0:/tai/hidkeyboard.skprx\n", modid);
     wait_key_press();
     return -1;
   }

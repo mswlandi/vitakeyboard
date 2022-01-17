@@ -4,12 +4,12 @@
 #include <psp2kern/udcd.h>
 
 #include "usb_descriptors.h"
-#include "hidmouse.h"
+#include "hidkeyboard.h"
 
 #define Kprintf(...) (void)0
 
-#define PSP_USB_MOUSE            "VITA_KEYBOARD"
-#define PSP_USB_MOUSE_PID        0x1338
+#define VITA_USB_KEYBOARD            "VITA_KEYBOARD"
+#define VITA_USB_KEYBOARD_PID        0x1338
 
 static char g_inputs[8] __attribute__ ((aligned(64))) = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 static struct SceUdcdDeviceRequest g_request;
@@ -30,7 +30,7 @@ static void usb_configure (int usb_version, int desc_count, struct SceUdcdInterf
 /* USB host driver */
 struct SceUdcdDriver g_driver =
 {
-  PSP_USB_MOUSE,               /* driverName */
+  VITA_USB_KEYBOARD,               /* driverName */
   2,                           /* numEndpoints */
   &endpoints[0],               /* endpoints */
   &interfaces[0],              /* interface */
@@ -156,7 +156,7 @@ void send_inputs (void)
 }
 
 static
-int update_mouse (SceSize args, void *argp)
+int update_keyboard (SceSize args, void *argp)
 {
   SceCtrlData pad;
   int pressed = 0;
@@ -193,7 +193,7 @@ int update_mouse (SceSize args, void *argp)
 }
 
 /* Usb start routine*/
-int mouse_start (void)
+int keyboard_start (void)
 {
   int ret = 0;
   ret = ksceUdcdRegister (&g_driver);
@@ -207,13 +207,13 @@ int mouse_start (void)
 
   ret = ksceUdcdStart ("USBDeviceControllerDriver", 0, 0);
   if (ret < 0) return ret;
-  ret = ksceUdcdStart (PSP_USB_MOUSE, 0, 0);
+  ret = ksceUdcdStart (VITA_USB_KEYBOARD, 0, 0);
   if (ret < 0) return ret;
 
-  ret = ksceUdcdActivate (PSP_USB_MOUSE_PID);
+  ret = ksceUdcdActivate (VITA_USB_KEYBOARD_PID);
   if (ret < 0) return ret;
 
-  g_thid = ksceKernelCreateThread ("update_thread", &update_mouse, 0x3C, 0x1000, 0, 0x10000, 0);
+  g_thid = ksceKernelCreateThread ("update_thread", &update_keyboard, 0x3C, 0x1000, 0, 0x10000, 0);
   if (g_thid >= 0) ksceKernelStartThread (g_thid, 0, 0);
   else return g_thid;
 
@@ -221,7 +221,7 @@ int mouse_start (void)
 }
 
 /* Usb stop */
-int mouse_stop (void)
+int keyboard_stop (void)
 {
   if (g_thid > 0) {
     SceUInt timeout = 0xFFFFFFFF;
@@ -231,7 +231,7 @@ int mouse_stop (void)
   }
 
   ksceUdcdDeactivate ();
-  ksceUdcdStop (PSP_USB_MOUSE, 0, 0);
+  ksceUdcdStop (VITA_USB_KEYBOARD, 0, 0);
   ksceUdcdStop ("USBDeviceControllerDriver", 0, 0);
   ksceUdcdUnregister (&g_driver);
   return 0;

@@ -4,7 +4,7 @@ set(CMAKE_SYSTEM_NAME "Generic")
 set(CMAKE_C_COMPILER "arm-vita-eabi-gcc")
 set(CMAKE_CXX_COMPILER "arm-vita-eabi-g++")
 
-project(hidmouse)
+project(hidkeyboard)
 
 set(CMAKE_C_FLAGS "-Wl,-q -Wall -O3 -std=gnu99")
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -fno-rtti -fno-exceptions")
@@ -18,7 +18,7 @@ link_directories(
 
 add_executable(${PROJECT_NAME}.elf
 	main.c
-	hidmouse.c
+	hidkeyboard.c
 )
 
 target_link_libraries(${PROJECT_NAME}.elf
@@ -46,6 +46,6 @@ add_custom_target(${PROJECT_NAME}.skprx ALL
 add_dependencies(${PROJECT_NAME}.skprx ${PROJECT_NAME}.elf)
 
 add_custom_target(send
-	COMMAND curl -T ${PROJECT_NAME}.skprx ftp://$(PSVITAIP):1337/ux0:/data/
+	COMMAND curl -T ${PROJECT_NAME}.skprx ftp://${PSVITAIP}:1337/ux0:/tai/
 	DEPENDS ${PROJECT_NAME}.skprx
 )
