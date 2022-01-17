@@ -1,0 +1,13 @@
+# build folders
+/skprx/build/
+/skprx/debug/
+/skprx/release/
+/vpk/build/
+/vpk/debug/
+/vpk/release/
+
+# vscode configs
+.vscode/
+
+# todo list and other pastes
+wip.md
