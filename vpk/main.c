@@ -16,10 +16,13 @@ SceImeCaret caret_rev;
 static void WaitKeyPress();
 SceUID LoadModule(const char *path, int flags, int type);
 void ImeEventHandler(void* arg, const SceImeEventData* e);
+int ImeInit();
+int HidKeyboardInit();
 
 int main (int argc, char **argv)
 {
     int res;
+    SceCtrlData pad;
 
     psvDebugScreenInit();
 
@@ -28,20 +31,29 @@ int main (int argc, char **argv)
         return -1;
     }
 
-    SceCtrlData pad;
+    res = ImeInit();
+    if (res < 0) {
+        printf("Failed opening virtual keyboard.\n");
+        WaitKeyPress();
+        return -1;
+    }
+
     printf("Press START to exit.\n");
     while (1) {
+
         sceCtrlPeekBufferPositive(0, &pad, 1);
         if (pad.buttons & SCE_CTRL_START)
             break;
         sceKernelDelayThread(16 * 1000); // about 60 fps
+
+        sceImeUpdate();
     }
 
     if (modid >= 0) {
         taiStopUnloadKernelModule(modid, 0, NULL, 0, NULL, NULL);
     }
 
-    printf ("OK\n");
+    sceKernelExitProcess(0);
     return 0;
 }
 
@@ -57,6 +69,32 @@ void WaitKeyPress()
         break;
         sceKernelDelayThread(100 * 1000);
     }
+}
+
+int ImeInit()
+{
+    sceSysmoduleLoadModule(SCE_SYSMODULE_IME);
+
+    memset(libime_out, 0, ((SCE_IME_MAX_PREEDIT_LENGTH + SCE_IME_MAX_TEXT_LENGTH + 1) * sizeof(SceWChar16)));
+
+    SceImeParam param;
+    SceInt32 res;
+
+    sceImeParamInit(&param);
+    param.supportedLanguages = SCE_IME_LANGUAGE_ENGLISH;
+    param.languagesForced = SCE_FALSE;
+    param.type = SCE_IME_TYPE_DEFAULT;
+    param.option = SCE_IME_OPTION_NO_ASSISTANCE;
+    param.inputTextBuffer = libime_out;
+    param.maxTextLength = SCE_IME_MAX_TEXT_LENGTH;
+    param.handler = ImeEventHandler;
+    param.filter = NULL;
+    param.initialText = (SceWChar16*)libime_initval;
+    param.arg = NULL;
+    param.work = libime_work;
+    res = sceImeOpen(&param);
+
+    return res;
 }
 
 int HidKeyboardInit()
