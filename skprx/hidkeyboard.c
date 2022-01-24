@@ -8,7 +8,7 @@
 
 #define Kprintf(...) (void)0
 
-#define VITA_USB_KEYBOARD                        "VITA_KEYBOARD"
+#define VITA_USB_KEYBOARD                    "VITA_KEYBOARD"
 #define VITA_USB_KEYBOARD_PID                0x1338
 
 static char g_inputs[8] __attribute__ ((aligned(64))) = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
@@ -86,7 +86,8 @@ int usb_recvctl (int arg1, int arg2, struct SceUdcdEP0DeviceRequest *req)
             g_reportrequest.unused = &g_reportrequest;
             g_reportrequest.next = NULL;
             g_reportrequest.physicalAddress = NULL;
-            ksceUdcdReqSend (&g_reportrequest);
+            // ksceUdcdReqSend (&g_reportrequest);
+            TEST_CALL(ksceUdcdReqSend, &g_reportrequest);
         }
     }
     return 0;
@@ -168,6 +169,18 @@ int update_keyboard (SceSize args, void *argp)
 
         ksceCtrlPeekBufferPositive(0, &pad, 1);
 
+        // if (hasPendingKey && !pressed) {
+        //     hasPendingKey = 0;
+        //     g_inputs[3] = pendingKey;
+        //     pressed = 1;
+        //     changed = 1;
+        // }
+        // else if (pressed) {
+        //     g_inputs[3] = 0x00;
+        //     pressed = 0;
+        //     changed = 1;
+        // }
+
         if (pad.buttons & SCE_CTRL_CROSS && !pressed)
         {
             g_inputs[3] = 0x10;
@@ -195,6 +208,8 @@ int update_keyboard (SceSize args, void *argp)
 /* Usb start routine*/
 int keyboard_start (void)
 {
+    LOG("entered keyboard_start\n");
+
     int ret = 0;
     ret = ksceUdcdRegister (&g_driver);
     if (ret < 0) return ret;

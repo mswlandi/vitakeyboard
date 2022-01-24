@@ -4,6 +4,7 @@
 #include "debugScreen.h"
 #include <psp2/sysmodule.h>
 #include <psp2/libime.h>
+#include "hidkeyboard_uapi.h"
 
 #define printf(...) psvDebugScreenPrintf(__VA_ARGS__)
 
@@ -53,7 +54,6 @@ int main (int argc, char **argv)
         taiStopUnloadKernelModule(modid, 0, NULL, 0, NULL, NULL);
     }
 
-    sceKernelExitProcess(0);
     return 0;
 }
 
@@ -124,6 +124,8 @@ int HidKeyboardInit()
         WaitKeyPress();
         return -1;
     }
+
+    return 0;
 }
 
 SceUID LoadModule(const char* path, int flags, int type)
@@ -151,6 +153,7 @@ void ImeEventHandler(void* arg, const SceImeEventData* e)
         break;
     case SCE_IME_EVENT_PRESS_ENTER:
         // enter
+        HidKeyboardSendKey();
         break;
     case SCE_IME_EVENT_PRESS_CLOSE:
         sceImeClose();
