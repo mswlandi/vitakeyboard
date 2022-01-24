@@ -1,6 +1,6 @@
-#ifndef VITASTICK_UAPI_H
-#define VITASTICK_UAPI_H
+#ifndef HIDKEYBOARD_UAPI_H
+#define HIDKEYBOARD_UAPI_H
 
-int HidKeyboardSendKey(void);
+extern int HidKeyboardSendKey(void);
 
 #endif

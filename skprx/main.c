@@ -1,6 +1,7 @@
 #include <psp2kern/kernel/modulemgr.h>
 #include "hidkeyboard.h"
 #include "uapi/hidkeyboard_uapi.h"
+#include <psp2kern/kernel/cpu.h> 
 
 // static int hasPendingKey = 0;
 // static char pendingKey = 0x10;
@@ -35,11 +36,17 @@ int module_stop (SceSize args, void *argp)
 
 int HidKeyboardSendKey(void)
 {
+    unsigned long state;
+
+    ENTER_SYSCALL(state);
+
     // res_mtx = ksceKernelLockMutex(mtx_lock, 1, NULL);
     // if (res_mtx < 0) return res_mtx;
 
     // res_mtx = ksceKernelUnlockMutex(mtx_lock, 1);
     // if (res_mtx < 0) return res_mtx;
     
+    EXIT_SYSCALL(state);
+
     return 1;
 }

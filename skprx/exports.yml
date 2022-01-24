@@ -8,6 +8,6 @@ hidkeyboard:
     stop: module_stop
   modules:
     HidKeyboardForUser:
-      syscall: false
+      syscall: true
       functions:
         - HidKeyboardSendKey

@@ -19,13 +19,13 @@ static int g_run = 1;
 
 
 /* Forward define driver functions */
-static int start_func (int size, void *args);
-static int stop_func (int size, void *args);
-static int usb_recvctl (int arg1, int arg2, struct SceUdcdEP0DeviceRequest *req);
-static int usb_change (int interfaceNumber, int alternateSetting);
-static int usb_attach (int usb_version);
-static void usb_detach (void);
-static void usb_configure (int usb_version, int desc_count, struct SceUdcdInterfaceSettings *settings);
+static int start_func (int size, void *args, void *user_data);
+static int stop_func (int size, void *args, void *user_data);
+static int usb_recvctl (int arg1, int arg2, struct SceUdcdEP0DeviceRequest *req, void *user_data);
+static int usb_change (int interfaceNumber, int alternateSetting, int bus);
+static int usb_attach (int usb_version, void *user_data);
+static void usb_detach (void *user_data);
+static void usb_configure (int usb_version, int desc_count, struct SceUdcdInterfaceSettings *settings, void *user_data);
 
 /* USB host driver */
 struct SceUdcdDriver g_driver =
@@ -66,7 +66,7 @@ void complete_request (struct SceUdcdDeviceRequest *req)
 
 /* Device request */
 static
-int usb_recvctl (int arg1, int arg2, struct SceUdcdEP0DeviceRequest *req)
+int usb_recvctl (int arg1, int arg2, struct SceUdcdEP0DeviceRequest *req, void *user_data)
 {
     Kprintf ("recvctl: %x %x\n", arg1, arg2);
     Kprintf ("request: %x type: %x wValue: %x wIndex: %x wLength: %x\n",
@@ -95,7 +95,7 @@ int usb_recvctl (int arg1, int arg2, struct SceUdcdEP0DeviceRequest *req)
 
 /* Alternate settings */
 static
-int usb_change (int interfaceNumber, int alternateSetting)
+int usb_change (int interfaceNumber, int alternateSetting, int bus)
 {
     Kprintf ("usb_change %d %d\n", interfaceNumber, alternateSetting);
     return 0;
@@ -103,7 +103,7 @@ int usb_change (int interfaceNumber, int alternateSetting)
 
 /* Attach callback */
 static
-int usb_attach (int usb_version)
+int usb_attach (int usb_version, void *user_data)
 {
     Kprintf ("usb_attach %d\n", usb_version);
     return 0;
@@ -111,20 +111,20 @@ int usb_attach (int usb_version)
 
 /* Detach callback */
 static
-void usb_detach (void)
+void usb_detach(void* user_data)
 {
     Kprintf ("usb_detach\n");
 }
 
 static
-void usb_configure (int usb_version, int desc_count, struct SceUdcdInterfaceSettings *settings)
+void usb_configure (int usb_version, int desc_count, struct SceUdcdInterfaceSettings *settings, void *user_data)
 {
     Kprintf ("usb_configure %d %d %p %d\n", usb_version, desc_count, settings, settings->numDescriptors);
 }
 
 /* USB start function */
 static
-int start_func (int size, void *p)
+int start_func (int size, void *p, void *user_data)
 {
     Kprintf ("start\n");
     return 0;
@@ -132,7 +132,7 @@ int start_func (int size, void *p)
 
 /* USB stop function */
 static
-int stop_func (int size, void *p)
+int stop_func (int size, void *p, void *user_data)
 {
     Kprintf ("stop\n");
     return 0;
