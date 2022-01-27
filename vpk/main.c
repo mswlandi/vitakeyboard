@@ -4,6 +4,7 @@
 #include "debugScreen.h"
 #include <psp2/sysmodule.h>
 #include <psp2/libime.h>
+#include <psp2/kernel/error.h> 
 #include "hidkeyboard_uapi.h"
 
 #define printf(...) psvDebugScreenPrintf(__VA_ARGS__)
@@ -22,18 +23,33 @@ int HidKeyboardInit();
 
 int main (int argc, char **argv)
 {
-    int res;
+    int ret;
     SceCtrlData pad;
 
     psvDebugScreenInit();
 
-    res = HidKeyboardInit();
-    if (res < 0) {
+    ret = HidKeyboardInit();
+    if (ret < 0) {
         return -1;
     }
 
-    res = ImeInit();
-    if (res < 0) {
+    printf("starting the module\n");
+
+    ret = hidkeyboard_user_start();
+    if (ret >= 0) {
+        printf("hidkeyboard started successfully!\n");
+    }
+    else if (ret == HIDKEYBOARD_ERROR_DRIVER_ALREADY_ACTIVATED) {
+        printf("hidkeyboard is already active!\n");
+    }
+    else if (ret < 0) {
+        printf("Error hidkeyboard_user_start(): 0x%08X\n", ret);
+        WaitKeyPress();
+        return -1;
+    }
+
+    ret = ImeInit();
+    if (ret < 0) {
         printf("Failed opening virtual keyboard.\n");
         WaitKeyPress();
         return -1;
@@ -43,16 +59,20 @@ int main (int argc, char **argv)
     while (1) {
 
         sceCtrlPeekBufferPositive(0, &pad, 1);
-        if (pad.buttons & SCE_CTRL_START)
+        if (pad.buttons & SCE_CTRL_START) {
+            HidKeyboardSendKey();
             break;
+        }
         sceKernelDelayThread(16 * 1000); // about 60 fps
 
         sceImeUpdate();
     }
 
-    if (modid >= 0) {
-        taiStopUnloadKernelModule(modid, 0, NULL, 0, NULL, NULL);
-    }
+    hidkeyboard_user_stop();
+
+    // if (modid >= 0) {
+    //     taiStopUnloadKernelModule(modid, 0, NULL, 0, NULL, NULL);
+    // }
 
     return 0;
 }
@@ -113,10 +133,16 @@ int HidKeyboardInit()
 
     printf("Starting hidkeyboard module... ");
     res = taiStartKernelModule(modid, 0, NULL, 0, NULL, &status);
-    if (res < 0) {
+    if (res < 0 && res != SCE_KERNEL_ERROR_MODULEMGR_OLD_LIB) {
         printf("failed with 0x%08X\n", res);
         WaitKeyPress();
         return -1;
+    }
+    else if (res == SCE_KERNEL_ERROR_MODULEMGR_OLD_LIB) {
+        printf("module already started...?\n");
+    }
+    else {
+        printf("ok\n");
     }
 
     if (status) {
@@ -153,7 +179,6 @@ void ImeEventHandler(void* arg, const SceImeEventData* e)
         break;
     case SCE_IME_EVENT_PRESS_ENTER:
         // enter
-        HidKeyboardSendKey();
         break;
     case SCE_IME_EVENT_PRESS_CLOSE:
         sceImeClose();

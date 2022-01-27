@@ -8,8 +8,7 @@ project(vitakeyboard)
 set(TITLE_ID "KEYBOARD0")
 set(TITLE_NAME "VitaKeyboard")
 
-set(CMAKE_C_FLAGS "-Wl,-q -Wall -std=gnu11")
-set(CMAKE_C_FLAGS_DEBUG "-O0 -g3") # added to gcc flags when MAKE_BUILD_TYPE=Debug
+set(CMAKE_C_FLAGS "-Wl,-q -Wall -std=gnu11 -O0 -g3") # -O0 -g3
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -fno-rtti -fno-exceptions")
 
 include_directories(
@@ -31,7 +30,7 @@ add_executable(${PROJECT_NAME}.elf
 )
 
 target_link_libraries(${PROJECT_NAME}.elf
-	hidkeyboard_stub
+	hidkeyboard_stub_weak
 	taihen_stub
 	vita2d
 	SceDisplay_stub
@@ -46,7 +45,6 @@ target_link_libraries(${PROJECT_NAME}.elf
 	jpeg
 	z
 	m
-	c
 	SceAppMgr_stub
 )
 

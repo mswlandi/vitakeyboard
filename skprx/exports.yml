@@ -11,3 +11,5 @@ hidkeyboard:
       syscall: true
       functions:
         - HidKeyboardSendKey
+        - hidkeyboard_user_start
+        - hidkeyboard_user_stop

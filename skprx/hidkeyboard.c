@@ -1,9 +1,4 @@
-#include <psp2kern/kernel/threadmgr.h>
-#include <psp2kern/kernel/cpu.h>
-#include <psp2kern/ctrl.h>
-#include <psp2kern/udcd.h>
 
-#include "usb_descriptors.h"
 #include "hidkeyboard.h"
 
 #define Kprintf(...) (void)0
@@ -11,12 +6,21 @@
 #define VITA_USB_KEYBOARD                    "VITA_KEYBOARD"
 #define VITA_USB_KEYBOARD_PID                0x1338
 
+#define EVF_CONNECTED		    (1 << 0)
+#define EVF_DISCONNECTED	    (1 << 1)
+#define EVF_EXIT		        (1 << 2)
+#define EVF_INT_REQ_COMPLETED	(1 << 3)
+#define EVF_ALL_MASK		    (EVF_INT_REQ_COMPLETED | (EVF_INT_REQ_COMPLETED - 1))
+
 static char g_inputs[8] __attribute__ ((aligned(64))) = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 static struct SceUdcdDeviceRequest g_request;
 static struct SceUdcdDeviceRequest g_reportrequest;
 static SceUID g_thid = -1;
 static int g_run = 1;
 
+static SceUID usb_event_flag_id;
+static int hidkeyboard_driver_registered = 0;
+static int hidkeyboard_driver_activated = 0;
 
 /* Forward define driver functions */
 static int start_func (int size, void *args, void *user_data);
@@ -206,38 +210,50 @@ int update_keyboard (SceSize args, void *argp)
 }
 
 /* Usb start routine*/
-int keyboard_start (void)
+int hidkeyboard_module_start (void)
 {
-    LOG("entered keyboard_start\n");
-
     int ret = 0;
-    ret = ksceUdcdRegister (&g_driver);
-    if (ret < 0) return ret;
-
-    ksceUdcdDeactivate();
-    ksceUdcdStop("USB_MTP_Driver", 0, NULL);
-    ksceUdcdStop("USBPSPCommunicationDriver", 0, NULL);
-    ksceUdcdStop("USBSerDriver", 0, NULL);
-    ksceUdcdStop("USBDeviceControllerDriver", 0, NULL);
-
-    ret = ksceUdcdStart ("USBDeviceControllerDriver", 0, 0);
-    if (ret < 0) return ret;
-    ret = ksceUdcdStart (VITA_USB_KEYBOARD, 0, 0);
-    if (ret < 0) return ret;
-
-    ret = ksceUdcdActivate (VITA_USB_KEYBOARD_PID);
-    if (ret < 0) return ret;
 
     g_thid = ksceKernelCreateThread ("update_thread", &update_keyboard, 0x3C, 0x1000, 0, 0x10000, 0);
-    if (g_thid >= 0) ksceKernelStartThread (g_thid, 0, 0);
-    else return g_thid;
+    if (g_thid < 0) {
+        goto err_return;
+    }
+
+    usb_event_flag_id = ksceKernelCreateEventFlag("hidkeyboard_event_flag", 0, 0, NULL);
+    if (usb_event_flag_id < 0) {
+        goto err_destroy_thread;
+    }
+
+    ret = ksceUdcdRegister (&g_driver);
+    if (ret < 0) {
+        goto err_delete_event_flag;
+    }
+
+    ret = ksceKernelStartThread (g_thid, 0, 0);
+    if (ret < 0) {
+        goto err_unregister;
+    }
+
+    hidkeyboard_driver_activated = 0;
+    hidkeyboard_driver_registered = 1;
 
     return 0;
+
+err_unregister:
+    ksceUdcdUnregister(&g_driver);
+err_delete_event_flag:
+    ksceKernelDeleteEventFlag(usb_event_flag_id);
+err_destroy_thread:
+    ksceKernelDeleteThread(g_thid);
+err_return:
+    return -1;
 }
 
 /* Usb stop */
-int keyboard_stop (void)
+int hidkeyboard_module_stop (void)
 {
+    ksceKernelSetEventFlag(usb_event_flag_id, EVF_EXIT);
+
     if (g_thid > 0) {
         SceUInt timeout = 0xFFFFFFFF;
         g_run = 0;
@@ -245,9 +261,94 @@ int keyboard_stop (void)
         ksceKernelDeleteThread(g_thid);
     }
 
-    ksceUdcdDeactivate ();
-    ksceUdcdStop (VITA_USB_KEYBOARD, 0, 0);
-    ksceUdcdStop ("USBDeviceControllerDriver", 0, 0);
-    ksceUdcdUnregister (&g_driver);
+    ksceKernelDeleteEventFlag(usb_event_flag_id);
+
+    ksceUdcdDeactivate();
+    ksceUdcdStop(VITA_USB_KEYBOARD, 0, NULL);
+    ksceUdcdStop("USBDeviceControllerDriver", 0, NULL);
+    ksceUdcdUnregister(&g_driver);
+
+    return 0;
+}
+
+int hidkeyboard_user_start(void)
+{
+    int state = 0;
+    int ret;
+
+    ENTER_SYSCALL(state);
+
+    if (!hidkeyboard_driver_registered) {
+        EXIT_SYSCALL(state);
+        return HIDKEYBOARD_ERROR_DRIVER_NOT_REGISTERED;
+    }
+    else if (hidkeyboard_driver_activated) {
+        EXIT_SYSCALL(state);
+        return HIDKEYBOARD_ERROR_DRIVER_ALREADY_ACTIVATED;
+    }
+
+    ret = ksceUdcdDeactivate();
+    if (ret < 0 && ret != SCE_UDCD_ERROR_INVALID_ARGUMENT) {
+        EXIT_SYSCALL(state);
+        return ret;
+    }
+
+    ksceUdcdStop("USB_MTP_Driver", 0, NULL);
+    ksceUdcdStop("USBPSPCommunicationDriver", 0, NULL);
+    ksceUdcdStop("USBSerDriver", 0, NULL);
+    ksceUdcdStop("USBDeviceControllerDriver", 0, NULL);
+
+    ret = ksceUdcdStart("USBDeviceControllerDriver", 0, 0);
+    if (ret < 0) {
+        EXIT_SYSCALL(state);
+        return ret;
+    }
+
+    ret = ksceUdcdStart(VITA_USB_KEYBOARD, 0, 0);
+    if (ret < 0) {
+        ksceUdcdStop("USBDeviceControllerDriver", 0, NULL);
+        EXIT_SYSCALL(state);
+        return ret;
+    }
+
+    ksceKernelClearEventFlag(usb_event_flag_id, ~EVF_ALL_MASK);
+
+    ret = ksceUdcdActivate(VITA_USB_KEYBOARD_PID);
+    if (ret < 0) {
+        ksceUdcdStop(VITA_USB_KEYBOARD, 0, NULL);
+        ksceUdcdStop("USBDeviceControllerDriver", 0, NULL);
+        EXIT_SYSCALL(state);
+        return ret;
+    }
+
+    hidkeyboard_driver_activated = 1;
+
+    EXIT_SYSCALL(state);
+    return 0;
+}
+
+int hidkeyboard_user_stop(void)
+{
+    int state = 0;
+
+    ENTER_SYSCALL(state);
+
+    if (!hidkeyboard_driver_activated) {
+        EXIT_SYSCALL(state);
+        return HIDKEYBOARD_ERROR_DRIVER_NOT_ACTIVATED;
+    }
+
+    ksceKernelSetEventFlag(usb_event_flag_id, EVF_DISCONNECTED);
+
+    ksceUdcdDeactivate();
+    ksceUdcdStop(VITA_USB_KEYBOARD, 0, NULL);
+    ksceUdcdStop("USBDeviceControllerDriver", 0, NULL);
+    ksceUdcdStart("USBDeviceControllerDriver", 0, NULL);
+    ksceUdcdStart("USB_MTP_Driver", 0, NULL);
+    ksceUdcdActivate(0x4E4);
+
+    hidkeyboard_driver_activated = 0;
+
+    EXIT_SYSCALL(state);
     return 0;
 }
