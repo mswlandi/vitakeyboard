@@ -9,7 +9,6 @@
 
 #define printf(...) psvDebugScreenPrintf(__VA_ARGS__)
 
-static SceUID modid;
 SceUInt32 libime_work[SCE_IME_WORK_BUFFER_SIZE / sizeof(SceInt32)];
 SceWChar16 libime_out[SCE_IME_MAX_PREEDIT_LENGTH + SCE_IME_MAX_TEXT_LENGTH + 1];
 char libime_initval[8] = { 1 };
@@ -28,12 +27,7 @@ int main (int argc, char **argv)
 
     psvDebugScreenInit();
 
-    // ret = HidKeyboardInit();
-    // if (ret < 0) {
-    //     return -1;
-    // }
-
-    printf("starting the module\n");
+    printf("starting the module... ");
 
     ret = hidkeyboard_user_start();
     if (ret >= 0) {
@@ -69,10 +63,6 @@ int main (int argc, char **argv)
     }
 
     hidkeyboard_user_stop();
-
-    // if (modid >= 0) {
-    //     taiStopUnloadKernelModule(modid, 0, NULL, 0, NULL, NULL);
-    // }
 
     return 0;
 }
@@ -115,48 +105,6 @@ int ImeInit()
     res = sceImeOpen(&param);
 
     return res;
-}
-
-int HidKeyboardInit()
-{
-    int res, status;
-
-    printf("Loading hidkeyboard module... ");
-    modid = LoadModule("ur0:/tai/hidkeyboard.skprx", 0, 0);
-    if (modid < 0) {
-        printf("failed with 0x%08X\n", modid);
-        printf("Place the skprx at ur0:/tai/hidkeyboard.skprx\n", modid);
-        WaitKeyPress();
-        return -1;
-    }
-    printf("OK\n");
-
-    printf("Starting hidkeyboard module... ");
-    res = taiStartKernelModule(modid, 0, NULL, 0, NULL, &status);
-    if (res < 0 && res != SCE_KERNEL_ERROR_MODULEMGR_OLD_LIB) {
-        printf("failed with 0x%08X\n", res);
-        WaitKeyPress();
-        return -1;
-    }
-    else if (res == SCE_KERNEL_ERROR_MODULEMGR_OLD_LIB) {
-        printf("module already started...?\n");
-    }
-    else {
-        printf("ok\n");
-    }
-
-    if (status) {
-        printf("failed with status = 0x%08X\n", status);
-        WaitKeyPress();
-        return -1;
-    }
-
-    return 0;
-}
-
-SceUID LoadModule(const char* path, int flags, int type)
-{
-    return taiLoadKernelModule(path, 0, NULL);
 }
 
 void ImeEventHandler(void* arg, const SceImeEventData* e)
