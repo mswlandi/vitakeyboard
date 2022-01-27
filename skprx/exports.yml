@@ -1,0 +1,15 @@
+hidkeyboard:
+  attributes: 0
+  version:
+    major: 1
+    minor: 0
+  main:
+    start: module_start
+    stop: module_stop
+  modules:
+    HidKeyboardForUser:
+      syscall: true
+      functions:
+        - HidKeyboardSendKey
+        - hidkeyboard_user_start
+        - hidkeyboard_user_stop
