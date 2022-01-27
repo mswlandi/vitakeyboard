@@ -47,16 +47,10 @@ target_link_libraries(${PROJECT_NAME}.elf
 # 	COMPILE_FLAGS "-D__VITA_KERNEL__"
 # )
 
-add_custom_target(${PROJECT_NAME}.skprx ALL
-	COMMAND vita-elf-create -e ${CMAKE_SOURCE_DIR}/exports.yml ${PROJECT_NAME}.elf ${PROJECT_NAME}.velf
-	COMMAND vita-make-fself ${PROJECT_NAME}.velf ${PROJECT_NAME}.skprx
+vita_create_self(${PROJECT_NAME}.skprx ${PROJECT_NAME}.elf
+	CONFIG exports.yml
+	UNSAFE
 )
-add_dependencies(${PROJECT_NAME}.skprx ${PROJECT_NAME}.elf)
-
-# vita_create_self(${PROJECT_NAME}.skprx ${PROJECT_NAME}.elf
-# 	CONFIG exports.yml
-# 	UNSAFE
-# )
 
 vita_create_stubs(stubs ${PROJECT_NAME}.elf ${CMAKE_SOURCE_DIR}/exports.yml KERNEL)
 

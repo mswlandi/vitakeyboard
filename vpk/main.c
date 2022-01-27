@@ -28,10 +28,10 @@ int main (int argc, char **argv)
 
     psvDebugScreenInit();
 
-    ret = HidKeyboardInit();
-    if (ret < 0) {
-        return -1;
-    }
+    // ret = HidKeyboardInit();
+    // if (ret < 0) {
+    //     return -1;
+    // }
 
     printf("starting the module\n");
 
@@ -122,10 +122,10 @@ int HidKeyboardInit()
     int res, status;
 
     printf("Loading hidkeyboard module... ");
-    modid = LoadModule("ux0:/tai/hidkeyboard.skprx", 0, 0);
+    modid = LoadModule("ur0:/tai/hidkeyboard.skprx", 0, 0);
     if (modid < 0) {
         printf("failed with 0x%08X\n", modid);
-        printf("Place the skprx at ux0:/tai/hidkeyboard.skprx\n", modid);
+        printf("Place the skprx at ur0:/tai/hidkeyboard.skprx\n", modid);
         WaitKeyPress();
         return -1;
     }
