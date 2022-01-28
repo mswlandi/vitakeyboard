@@ -10,6 +10,7 @@ hidkeyboard:
     HidKeyboardForUser:
       syscall: true
       functions:
-        - HidKeyboardSendKey
+        - HidKeyboardSendChar
+        - HidKeyBoardSendModifierAndKey
         - hidkeyboard_user_start
         - hidkeyboard_user_stop

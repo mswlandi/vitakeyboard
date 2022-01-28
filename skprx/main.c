@@ -1,12 +1,12 @@
 #include <psp2kern/kernel/modulemgr.h>
 #include <psp2kern/kernel/cpu.h>
 #include <psp2kern/kernel/threadmgr.h>
-#include <psp2kern/ctrl.h>
 #include <psp2kern/udcd.h>
 
 #include "log.h"
 #include "uapi/hidkeyboard_uapi.h"
 #include "usb_descriptors.h"
+#include "ascii_to_usb_hid.h"
 
 #define Kprintf(...) (void)0
 
@@ -28,6 +28,11 @@ static int g_run = 1;
 static SceUID usb_event_flag_id;
 static int hidkeyboard_driver_registered = 0;
 static int hidkeyboard_driver_activated = 0;
+
+static int hasPendingKey = 0;
+static char pendingKey = 0x00;
+static char modifier = 0x00;
+int mtxLock = -1;
 
 /* Forward define driver functions */
 static int start_func(int size, void* args, void* user_data);
@@ -170,40 +175,28 @@ void send_inputs(void)
 static
 int update_keyboard(SceSize args, void* argp)
 {
-    SceCtrlData pad;
     int pressed = 0;
     int changed = 0;
 
-    //ksceCtrlSetSamplingCycle (0);
-    ksceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
     while (g_run) {
 
-        ksceCtrlPeekBufferPositive(0, &pad, 1);
+        ksceKernelLockMutex(mtxLock, 1, 0);
+        if (hasPendingKey && !pressed) {
+            g_inputs[0] = modifier;
+            g_inputs[3] = pendingKey;
 
-        // if (hasPendingKey && !pressed) {
-        //     hasPendingKey = 0;
-        //     g_inputs[3] = pendingKey;
-        //     pressed = 1;
-        //     changed = 1;
-        // }
-        // else if (pressed) {
-        //     g_inputs[3] = 0x00;
-        //     pressed = 0;
-        //     changed = 1;
-        // }
-
-        if (pad.buttons & SCE_CTRL_CROSS && !pressed)
-        {
-            g_inputs[3] = 0x10;
+            hasPendingKey = 0;
             pressed = 1;
             changed = 1;
         }
-        else if (!(pad.buttons & SCE_CTRL_CROSS) && pressed)
-        {
+        else if (pressed) {
+            g_inputs[0] = 0x00;
             g_inputs[3] = 0x00;
+
             pressed = 0;
             changed = 1;
         }
+        ksceKernelUnlockMutex(mtxLock, 1);
 
         ksceKernelCpuDcacheAndL2WritebackRange(g_inputs, sizeof(g_inputs));
 
@@ -216,14 +209,10 @@ int update_keyboard(SceSize args, void* argp)
     return 0;
 }
 
-// static int hasPendingKey = 0;
-// static char pendingKey = 0x10;
-
 void _start() __attribute__ ((weak, alias ("module_start")));
 
 int module_start (SceSize args, void *argp)
 {
-    // if returns -1 SCE_KERNEL_START_FAILED
     int ret = 0;
 
     g_thid = ksceKernelCreateThread("update_thread", &update_keyboard, 0x3C, 0x1000, 0, 0x10000, 0);
@@ -332,6 +321,8 @@ int hidkeyboard_user_start(void)
         return ret;
     }
 
+    mtxLock = ksceKernelCreateMutex("HidKeyboardMutex", 0, 0, 0);
+
     hidkeyboard_driver_activated = 1;
 
     EXIT_SYSCALL(state);
@@ -358,23 +349,51 @@ int hidkeyboard_user_stop(void)
     ksceUdcdStart("USB_MTP_Driver", 0, NULL);
     ksceUdcdActivate(0x4E4);
 
+    ksceKernelDeleteMutex(mtxLock);
+    mtxLock = -1;
+
     hidkeyboard_driver_activated = 0;
 
     EXIT_SYSCALL(state);
     return 0;
 }
 
-int HidKeyboardSendKey(void)
+int HidKeyBoardSendModifierAndKey(char mod, char key)
 {
     int state = 0;
 
     ENTER_SYSCALL(state);
 
-    log_reset();
+    ksceKernelLockMutex(mtxLock, 1, 0);
+    hasPendingKey = 1;
+    modifier = mod;
+    pendingKey = key;
+    ksceKernelUnlockMutex(mtxLock, 1);
 
-    LOG("yay HidKeyboardSendKey works");
+    EXIT_SYSCALL(state);
 
-    log_flush();
+    return 0;
+}
+
+// sets the key to be sent from an ASCII character
+int HidKeyboardSendChar(char c)
+{
+    int state = 0;
+
+    ENTER_SYSCALL(state);
+
+    if (c > 127 || c < 32) {
+        EXIT_SYSCALL(state);
+        return 0;
+    }
+
+    c -= 32; // offset ignore the first 32 symbols in ascii table
+
+    ksceKernelLockMutex(mtxLock, 1, 0);
+    hasPendingKey = 1;
+    modifier = ascii_to_hid_key_map[c][0];
+    pendingKey = ascii_to_hid_key_map[c][1];
+    ksceKernelUnlockMutex(mtxLock, 1);
 
     EXIT_SYSCALL(state);
 

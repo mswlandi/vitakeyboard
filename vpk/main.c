@@ -19,6 +19,7 @@ SceUID LoadModule(const char *path, int flags, int type);
 void ImeEventHandler(void* arg, const SceImeEventData* e);
 int ImeInit();
 int HidKeyboardInit();
+static void utf16_to_utf8(const uint16_t* src, uint8_t* dst);
 
 int main (int argc, char **argv)
 {
@@ -54,10 +55,9 @@ int main (int argc, char **argv)
 
         sceCtrlPeekBufferPositive(0, &pad, 1);
         if (pad.buttons & SCE_CTRL_START) {
-            HidKeyboardSendKey();
             break;
         }
-        sceKernelDelayThread(16 * 1000); // about 60 fps
+        sceKernelDelayThread(10 * 1000); // about 100 fps
 
         sceImeUpdate();
     }
@@ -107,17 +107,49 @@ int ImeInit()
     return res;
 }
 
+static void utf16_to_utf8(const uint16_t* src, uint8_t* dst) {
+    int i;
+    for (i = 0; src[i]; i++) {
+        if ((src[i] & 0xFF80) == 0) {
+            *(dst++) = src[i] & 0xFF;
+        }
+        else if ((src[i] & 0xF800) == 0) {
+            *(dst++) = ((src[i] >> 6) & 0xFF) | 0xC0;
+            *(dst++) = (src[i] & 0x3F) | 0x80;
+        }
+        else if ((src[i] & 0xFC00) == 0xD800 && (src[i + 1] & 0xFC00) == 0xDC00) {
+            *(dst++) = (((src[i] + 64) >> 8) & 0x3) | 0xF0;
+            *(dst++) = (((src[i] >> 2) + 16) & 0x3F) | 0x80;
+            *(dst++) = ((src[i] >> 4) & 0x30) | 0x80 | ((src[i + 1] << 2) & 0xF);
+            *(dst++) = (src[i + 1] & 0x3F) | 0x80;
+            i += 1;
+        }
+        else {
+            *(dst++) = ((src[i] >> 12) & 0xF) | 0xE0;
+            *(dst++) = ((src[i] >> 6) & 0x3F) | 0x80;
+            *(dst++) = (src[i] & 0x3F) | 0x80;
+        }
+    }
+
+    *dst = '\0';
+}
+
 void ImeEventHandler(void* arg, const SceImeEventData* e)
 {
+    uint8_t utf8_buffer[SCE_IME_MAX_TEXT_LENGTH];
+
     switch (e->id) {
     case SCE_IME_EVENT_UPDATE_TEXT:
         if (e->param.text.caretIndex == 0) {
             // backspace
+            HidKeyBoardSendModifierAndKey(0x00, 0x2a);
             sceImeSetText((SceWChar16*)libime_initval, 4);
         }
         else {
-            // test for scancode from key
-            // if not space, utf16_toutf8 to send text
+            // new character
+            utf16_to_utf8((SceWChar16*)&libime_out[1], utf8_buffer);
+            HidKeyboardSendChar(utf8_buffer[0]);
+
             memset(&caret_rev, 0, sizeof(SceImeCaret));
             memset(libime_out, 0, ((SCE_IME_MAX_PREEDIT_LENGTH + SCE_IME_MAX_TEXT_LENGTH + 1) * sizeof(SceWChar16)));
             caret_rev.index = 1;
@@ -127,6 +159,7 @@ void ImeEventHandler(void* arg, const SceImeEventData* e)
         break;
     case SCE_IME_EVENT_PRESS_ENTER:
         // enter
+        HidKeyBoardSendModifierAndKey(0x00, 0x58);
         break;
     case SCE_IME_EVENT_PRESS_CLOSE:
         sceImeClose();
