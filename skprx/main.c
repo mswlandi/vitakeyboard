@@ -13,19 +13,12 @@
 #define VITA_USB_KEYBOARD                    "VITA_KEYBOARD"
 #define VITA_USB_KEYBOARD_PID                0x1338
 
-#define EVF_CONNECTED		    (1 << 0)
-#define EVF_DISCONNECTED	    (1 << 1)
-#define EVF_EXIT		        (1 << 2)
-#define EVF_INT_REQ_COMPLETED	(1 << 3)
-#define EVF_ALL_MASK		    (EVF_INT_REQ_COMPLETED | (EVF_INT_REQ_COMPLETED - 1))
-
 static char g_inputs[8] __attribute__((aligned(64))) = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 static struct SceUdcdDeviceRequest g_request;
 static struct SceUdcdDeviceRequest g_reportrequest;
 static SceUID g_thid = -1;
 static int g_run = 1;
 
-static SceUID usb_event_flag_id;
 static int hidkeyboard_driver_registered = 0;
 static int hidkeyboard_driver_activated = 0;
 
@@ -102,8 +95,7 @@ int usb_recvctl(int arg1, int arg2, struct SceUdcdEP0DeviceRequest* req, void* u
             g_reportrequest.unused = &g_reportrequest;
             g_reportrequest.next = NULL;
             g_reportrequest.physicalAddress = NULL;
-            // ksceUdcdReqSend (&g_reportrequest);
-            TEST_CALL(ksceUdcdReqSend, &g_reportrequest);
+            ksceUdcdReqSend (&g_reportrequest);
         }
     }
     return 0;
@@ -202,6 +194,7 @@ int update_keyboard(SceSize args, void* argp)
 
         if (ksceUdcdGetDeviceState() & SCE_UDCD_STATUS_CONNECTION_ESTABLISHED && changed)
             send_inputs();
+            
         ksceKernelDelayThread(10000);
 
         changed = 0;
@@ -220,14 +213,9 @@ int module_start (SceSize args, void *argp)
         goto err_return;
     }
 
-    usb_event_flag_id = ksceKernelCreateEventFlag("hidkeyboard_event_flag", 0, 0, NULL);
-    if (usb_event_flag_id < 0) {
-        goto err_destroy_thread;
-    }
-
     ret = ksceUdcdRegister(&g_driver);
     if (ret < 0) {
-        goto err_delete_event_flag;
+        goto err_destroy_thread;
     }
 
     ret = ksceKernelStartThread(g_thid, 0, 0);
@@ -242,8 +230,6 @@ int module_start (SceSize args, void *argp)
 
 err_unregister:
     ksceUdcdUnregister(&g_driver);
-err_delete_event_flag:
-    ksceKernelDeleteEventFlag(usb_event_flag_id);
 err_destroy_thread:
     ksceKernelDeleteThread(g_thid);
 err_return:
@@ -252,16 +238,12 @@ err_return:
 
 int module_stop (SceSize args, void *argp)
 {
-    ksceKernelSetEventFlag(usb_event_flag_id, EVF_EXIT);
-
     if (g_thid > 0) {
         SceUInt timeout = 0xFFFFFFFF;
         g_run = 0;
         ksceKernelWaitThreadEnd(g_thid, NULL, &timeout);
         ksceKernelDeleteThread(g_thid);
     }
-
-    ksceKernelDeleteEventFlag(usb_event_flag_id);
 
     ksceUdcdDeactivate();
     ksceUdcdStop(VITA_USB_KEYBOARD, 0, NULL);
@@ -311,8 +293,6 @@ int hidkeyboard_user_start(void)
         return ret;
     }
 
-    ksceKernelClearEventFlag(usb_event_flag_id, ~EVF_ALL_MASK);
-
     ret = ksceUdcdActivate(VITA_USB_KEYBOARD_PID);
     if (ret < 0) {
         ksceUdcdStop(VITA_USB_KEYBOARD, 0, NULL);
@@ -339,8 +319,6 @@ int hidkeyboard_user_stop(void)
         EXIT_SYSCALL(state);
         return HIDKEYBOARD_ERROR_DRIVER_NOT_ACTIVATED;
     }
-
-    ksceKernelSetEventFlag(usb_event_flag_id, EVF_DISCONNECTED);
 
     ksceUdcdDeactivate();
     ksceUdcdStop(VITA_USB_KEYBOARD, 0, NULL);
