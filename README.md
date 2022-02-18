@@ -8,7 +8,8 @@ VitaKeyboard is a plugin and application for PS Vita that lets you use it as a U
 ur0:tai/hidkeyboard.skprx
 ```
 2. Install vitakeyboard.vpk
-3. On the host computer, make sure you're using the English (US) QWERTY layout
+3. Reboot the vita to load the kernel plugin
+4. On the host computer, make sure you're using the English (US) QWERTY layout
 
 ## About Special Characters
 vitakeyboard emulates an actual physical keyboard that would use the English (US) layout, so only characters that are in a normal keyboard with that layout are sent.
