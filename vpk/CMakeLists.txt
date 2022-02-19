@@ -1,14 +1,21 @@
 cmake_minimum_required(VERSION 2.8)
 
-set(CMAKE_SYSTEM_NAME "Generic")
-set(CMAKE_C_COMPILER "arm-vita-eabi-gcc")
-set(CMAKE_CXX_COMPILER "arm-vita-eabi-g++")
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+	if(DEFINED ENV{VITASDK})
+		set(CMAKE_TOOLCHAIN_FILE "$ENV{VITASDK}/share/vita.toolchain.cmake" CACHE PATH "toolchain file")
+	else()
+		message(FATAL_ERROR "Please define VITASDK to point to your SDK path!")
+	endif()
+endif()
 
 project(vitakeyboard)
+include("${VITASDK}/share/vita.cmake" REQUIRED)
+
 set(TITLE_ID "KEYBOARD0")
 set(TITLE_NAME "VitaKeyboard")
+set(VITA_VERSION "01.02")
 
-set(CMAKE_C_FLAGS "-Wl,-q -Wall -std=gnu11 -O0 -g3") # -O0 -g3
+set(CMAKE_C_FLAGS "-Wl,-q -Wall -std=gnu11") # -O0 -g3
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -fno-rtti -fno-exceptions")
 
 include_directories(
@@ -48,17 +55,14 @@ target_link_libraries(${PROJECT_NAME}.elf
 	SceAppMgr_stub
 )
 
-add_custom_target(${PROJECT_NAME}.velf ALL
-	COMMAND vita-elf-create ${PROJECT_NAME}.elf ${PROJECT_NAME}.velf
-)
-
-add_custom_target(eboot.bin ALL
-	COMMAND vita-make-fself ${PROJECT_NAME}.velf eboot.bin
-)
-
-add_custom_target(${PROJECT_NAME}.vpk ALL
-	COMMAND vita-mksfoex -s TITLE_ID=${TITLE_ID} "${TITLE_NAME}" param.sfo
-	COMMAND vita-pack-vpk -s param.sfo -b eboot.bin ${PROJECT_NAME}.vpk
+vita_create_self(eboot.bin ${PROJECT_NAME}.elf)
+vita_create_vpk(${PROJECT_NAME}.vpk ${TITLE_ID} eboot.bin
+	VERSION	${VITA_VERSION}
+	NAME ${TITLE_NAME}
+	FILE pkg/sce_sys/icon0.png sce_sys/icon0.png
+		 pkg/sce_sys/livearea/contents/bg.png sce_sys/livearea/contents/bg.png
+		 pkg/sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
+		 pkg/sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
 )
 
 add_custom_target(vpksend
@@ -67,10 +71,6 @@ add_custom_target(vpksend
 )
 
 add_custom_target(send
-	COMMAND curl -T eboot.bin ftp://$(PSVITAIP):1337/ux0:/app/${TITLE_ID}/
+	COMMAND curl -T eboot.bin ftp://$(PSVITAIP):1337/ux0:/app/${TITLE_ID}/eboot.bin
 	DEPENDS eboot.bin
 )
-
-add_dependencies(${PROJECT_NAME}.velf ${PROJECT_NAME}.elf)
-add_dependencies(eboot.bin ${PROJECT_NAME}.velf)
-add_dependencies(${PROJECT_NAME}.vpk eboot.bin)

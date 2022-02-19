@@ -19,3 +19,4 @@ If other layouts were to be supported, some characters still wouldn't easily be 
 - hnaves for making [hidmouse](https://github.com/esxgx/hidmouse) and xerpi for [porting it to vita](https://github.com/xerpi/hidmouse), of which this is a fork from
 - xerpi for making [vitastick](https://github.com/xerpi/vitastick), from which a lot of this code is based on (looking back, it would probably be easier to fork from it lol)
 - SonicMastr for help with libime and loading modules
+- LiveArea design is based on the one made for vitastick by [@nkrapivin](https://github.com/nkrapivin)
