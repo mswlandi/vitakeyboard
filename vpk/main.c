@@ -29,6 +29,7 @@ int main (int argc, char **argv)
 
     psvDebugScreenInit();
 
+    printf("VitaKeyboard by MarkOfTheLand\n");
     printf("starting the module... ");
 
     // stops before starting in case app was reset
@@ -45,6 +46,8 @@ int main (int argc, char **argv)
         WaitKeyPress();
         return -1;
     }
+
+    printf("\nClose the virtual keyboard and press START to properly\nclose the application.\n");
 
     ret = ImeInit();
     if (ret < 0) {
@@ -66,6 +69,9 @@ int main (int argc, char **argv)
                 WaitKeyPress();
                 break;
             }
+        }
+        if (pad.buttons & SCE_CTRL_START) {
+            break;
         }
         sceKernelDelayThread(10 * 1000); // about 100 fps
 
