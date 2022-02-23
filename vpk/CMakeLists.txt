@@ -20,6 +20,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -fno-rtti -fno-exceptions")
 
 include_directories(
 	${PROJECT_SOURCE_DIR}/../skprx/uapi
+	${PROJECT_SOURCE_DIR}/../skprx/layouts
 )
 
 link_directories(

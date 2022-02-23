@@ -7,6 +7,7 @@
 #include "uapi/hidkeyboard_uapi.h"
 #include "usb_descriptors.h"
 #include "ascii_to_usb_hid.h"
+#include "layouts/layouts.h"
 
 #define Kprintf(...) (void)0
 
@@ -353,24 +354,28 @@ int HidKeyBoardSendModifierAndKey(char mod, char key)
     return 0;
 }
 
-// sets the key to be sent from an ASCII character
-int HidKeyboardSendChar(char c)
+// sets the key to be sent from an UTF16 character
+int HidKeyboardSendChar(unsigned short int c)
 {
     int state = 0;
 
     ENTER_SYSCALL(state);
 
-    if (c > 127 || c < 32) {
-        EXIT_SYSCALL(state);
+    utf16_to_hid_mapping map;
+
+    map = getLayoutMappingFromUtf16(c, pt_BR_layout, sizeof(pt_BR_layout) / sizeof(utf16_to_hid_mapping));
+
+    // just ignore characters that can't be sent with current layout
+    if (map.utf16_char == VITAKEYBOARD_ERR_MAPPING_NOT_FOUND) {
         return 0;
     }
 
-    c -= 32; // offset ignore the first 32 symbols in ascii table
-
     ksceKernelLockMutex(mtxLock, 1, 0);
+
     hasPendingKey = 1;
-    modifier = ascii_to_hid_key_map[c][0];
-    pendingKey = ascii_to_hid_key_map[c][1];
+    pendingKey = map.hid_key1;
+    modifier = map.hid_modifiers1;
+
     ksceKernelUnlockMutex(mtxLock, 1);
 
     EXIT_SYSCALL(state);
