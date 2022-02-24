@@ -86,7 +86,7 @@ for xml_file_name in layout_file_list:
     # header of the header file
     header_file_lines = [
         f'#ifndef {layout_name.upper()}_H\n',
-        f'#define {layout_name.upper()}_H\n\n'
+        f'#define {layout_name.upper()}_H\n\n',
         '#include "layout_general.h"\n\n',
         f'const utf16_to_hid_mapping {layout_name}_layout[] = {{\n'
     ]

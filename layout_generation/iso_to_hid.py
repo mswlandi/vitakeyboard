@@ -60,7 +60,7 @@ iso_to_hid = {
     "B08": 0x36, # Keyboard , and <
     "B09": 0x37, # Keyboard . and >
     "B10": 0x38, # Keyboard / and ?
-    "B11": 0x64, # Keyboard Non-US \ and |
+    "B11": 0x87, # Keyboard (Brazilian) / and ?
     
     "A03": 0x2c, # Keyboard Spacebar
 }

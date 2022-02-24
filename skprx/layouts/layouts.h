@@ -13,10 +13,12 @@ typedef struct layout_list_entry_t {
 
 #include "en_US.h"
 #include "pt_BR.h"
+#include "es_ES.h"
 
 layout_list_entry layout_list[] = {
-    {"english (US)", en_US_layout, sizeof(en_US_layout) / sizeof(utf16_to_hid_mapping)},
-    {"portuguese (BR)", pt_BR_layout, sizeof(pt_BR_layout) / sizeof(utf16_to_hid_mapping)}
+    {"English (US)", en_US_layout, sizeof(en_US_layout) / sizeof(utf16_to_hid_mapping)},
+    {"Portuguese (Brazil)", pt_BR_layout, sizeof(pt_BR_layout) / sizeof(utf16_to_hid_mapping)},
+    {"Spanish (Spain)", es_ES_layout, sizeof(es_ES_layout) / sizeof(utf16_to_hid_mapping)}
 };
 
 utf16_to_hid_mapping getLayoutMappingFromUtf16(unsigned short int utf16char, const utf16_to_hid_mapping layout[], int num_mappings)

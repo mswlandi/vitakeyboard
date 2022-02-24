@@ -176,7 +176,7 @@ int update_keyboard(SceSize args, void* argp)
         ksceKernelLockMutex(mtxLock, 1, 0);
         if (hasPendingKey && !pressed) {
             g_inputs[0] = modifier;
-            g_inputs[3] = pendingKey;
+            g_inputs[2] = pendingKey;
 
             hasPendingKey = 0;
             pressed = 1;
@@ -184,7 +184,7 @@ int update_keyboard(SceSize args, void* argp)
         }
         else if (pressed) {
             g_inputs[0] = 0x00;
-            g_inputs[3] = 0x00;
+            g_inputs[2] = 0x00;
 
             pressed = 0;
             changed = 1;
