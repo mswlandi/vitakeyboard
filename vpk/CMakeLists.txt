@@ -34,7 +34,7 @@ endif()
 
 add_executable(${PROJECT_NAME}.elf
 	main.c
-	debugScreenFont.c
+	debugScreen.c
 )
 
 target_link_libraries(${PROJECT_NAME}.elf
