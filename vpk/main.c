@@ -1,14 +1,15 @@
 #include <stdio.h>
 #include <psp2/ctrl.h>
-#include <taihen.h>
 #include <psp2/sysmodule.h>
 #include <psp2/libime.h>
-#include <psp2/kernel/error.h> 
+#include <psp2/kernel/error.h>
+#include <psp2/appmgr.h>
 #include "hidkeyboard_uapi.h"
 #include "layouts.h"
 #include "debugScreen.h"
 
 #define printf psvDebugScreenPrintf
+#define SAVEFILEPATH "ux0:/data/vitakeyboard_savefile.bin"
 
 SceUInt32 libime_work[SCE_IME_WORK_BUFFER_SIZE / sizeof(SceInt32)];
 SceWChar16 libime_out[SCE_IME_MAX_PREEDIT_LENGTH + SCE_IME_MAX_TEXT_LENGTH + 1];
@@ -24,6 +25,8 @@ void ImeEventHandler(void* arg, const SceImeEventData* e);
 void DebugScreenInit();
 int ImeInit();
 int HidKeyboardInit();
+void LoadSavedLayoutChoice();
+void SaveLayoutChoice();
 
 int main (int argc, char **argv)
 {
@@ -67,8 +70,11 @@ int main (int argc, char **argv)
         return -1;
     }
 
-    int layout_sel_cursor = 0;
+    LoadSavedLayoutChoice();
+
+    int layout_sel_cursor = layout_choice;
     int is_updown_pressed = 0;
+    int is_x_pressed = 0;
 
     while (1) {
 
@@ -112,14 +118,18 @@ int main (int argc, char **argv)
             }
             is_updown_pressed = 1;
         }
-        // up nor down are pressed: allow for selection to move again
         else if (!(pad.buttons & SCE_CTRL_DOWN) && !(pad.buttons & SCE_CTRL_UP)) {
             is_updown_pressed = 0;
         }
 
         // CROSS: select layout
-        if (pad.buttons & SCE_CTRL_CROSS) {
+        if (pad.buttons & SCE_CTRL_CROSS && !is_x_pressed) {
             layout_choice = layout_sel_cursor;
+            SaveLayoutChoice();
+            is_x_pressed = 1;
+        }
+        else if (!(pad.buttons & SCE_CTRL_CROSS) && is_x_pressed) {
+            is_x_pressed = 0;
         }
 
         // TRIANGLE: reopen the IME if it is closed
@@ -248,4 +258,43 @@ void ImeEventHandler(void* arg, const SceImeEventData* e)
         sceImeClose();
         break;
     }
+}
+
+void LoadSavedLayoutChoice()
+{
+    FILE* fd = fopen(SAVEFILEPATH, "rb");
+
+    if (fd != NULL) {
+        fread(&layout_choice, sizeof(int), 1, fd);
+    }
+    else {
+        // Create and populate savedata if doesn't exist
+        FILE* fd = fopen(SAVEFILEPATH, "wb");
+        if (fd != NULL) {
+            fwrite(&layout_choice, sizeof(int), 1, fd);
+        }
+        else {
+            printf("\e[s"); // Saves cursor position
+            printf("\e[15;25H" "error creating savefile");
+            printf("\e[u"); // Return to saved cursor position
+        }
+    }
+
+    fclose(fd);
+}
+
+void SaveLayoutChoice()
+{
+    FILE* fd = fopen(SAVEFILEPATH, "wb");
+
+    if (fd != NULL) {
+        fwrite(&layout_choice, sizeof(int), 1, fd);
+    }
+    else {
+        printf("\e[s"); // Saves cursor position
+        printf("\e[15;25H" "error saving on savefile");
+        printf("\e[u"); // Return to saved cursor position
+    }
+
+    fclose(fd);
 }

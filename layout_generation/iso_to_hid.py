@@ -49,7 +49,7 @@ iso_to_hid = {
     "C12": 0x32, # Keyboard Non-US # and ~
     "C13": 0x28, # Keyboard Return (ENTER)
 
-    "B00": 0x31, # Keyboard \ and |
+    "B00": 0x64, # Keyboard Non-US \ and | (left of Z key)
     "B01": 0x1d, # Keyboard z and Z
     "B02": 0x1b, # Keyboard x and X
     "B03": 0x06, # Keyboard c and C

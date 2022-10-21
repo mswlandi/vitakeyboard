@@ -15,6 +15,29 @@ ur0:tai/hidkeyboard.skprx
 vitakeyboard emulates an actual physical keyboard that would use the English (US) layout, so only characters that are in a normal keyboard with that layout are sent.
 If other layouts were to be supported, some characters still wouldn't easily be sent. For example, when using the Portuguese (Brazil) layout, to send the special character `á` (that you can find on the vita's virtual keyboard), you'd have to first hit the `´` key and then the `a` key.
 
+## Other considerations
+layout savedata is stored in `ux0:data/vitakeyboard_savefile.bin`
+
+## Building
+from the root folder:
+
+```shell
+cd skprx
+mkdir build
+cd build
+cmake ..
+make
+
+cd ../..
+
+cd vpk
+mkdir build
+cmake ..
+make
+```
+
+the relevant outputs are `skprx/build/hidkeayboard.skprx` and `vpk/build/vitakeyboard.vpk`
+
 ## Credits
 - hnaves for making [hidmouse](https://github.com/esxgx/hidmouse) and xerpi for [porting it to vita](https://github.com/xerpi/hidmouse), of which this is a fork from
 - xerpi for making [vitastick](https://github.com/xerpi/vitastick), from which a lot of this code is based on (looking back, it would probably be easier to fork from it lol)
