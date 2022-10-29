@@ -9,14 +9,11 @@ ur0:tai/hidkeyboard.skprx
 ```
 2. Install vitakeyboard.vpk
 3. Reboot the vita to load the kernel plugin
-4. On the host computer, make sure you're using the English (US) QWERTY layout
-
-## About Special Characters
-vitakeyboard emulates an actual physical keyboard that would use the English (US) layout, so only characters that are in a normal keyboard with that layout are sent.
-If other layouts were to be supported, some characters still wouldn't easily be sent. For example, when using the Portuguese (Brazil) layout, to send the special character `á` (that you can find on the vita's virtual keyboard), you'd have to first hit the `´` key and then the `a` key.
+4. Before typing, make sure the host computer is using the same keyboard layout as the one selected in VitaKeyboard.
 
 ## Other considerations
-layout savedata is stored in `ux0:data/vitakeyboard_savefile.bin`
+- if there is a keyboard layout that you'd like to be added, submit an issue or follow the instructions at `layout_generation/README.md` and build the project yourself (pull requests are welcome).
+- layout savedata is stored in `ux0:data/vitakeyboard_savefile.bin`
 
 ## Building
 from the root folder:
@@ -39,7 +36,22 @@ make
 the relevant outputs are `skprx/build/hidkeayboard.skprx` and `vpk/build/vitakeyboard.vpk`
 
 ## Credits
-- hnaves for making [hidmouse](https://github.com/esxgx/hidmouse) and xerpi for [porting it to vita](https://github.com/xerpi/hidmouse), of which this is a fork from
+- hnaves for making [hidmouse](https://github.com/esxgx/hidmouse) and xerpi for [porting it to vita](https://github.com/xerpi/hidmouse), of which this was initially a fork from
 - xerpi for making [vitastick](https://github.com/xerpi/vitastick), from which a lot of this code is based on (looking back, it would probably be easier to fork from it lol)
 - SonicMastr for help with libime and loading modules
 - LiveArea design is based on the one made for vitastick by [@nkrapivin](https://github.com/nkrapivin)
+
+## Changelog
+
+### v1.1
+
+- added support for other keyboard layouts
+  - added pt (BR) layout
+  - added es (ES) layout
+  - added de (DE) layout
+- added LiveArea design
+- added better way to close the application (START while IME is closed)
+
+### v0.1-alpha
+
+- First Release.
